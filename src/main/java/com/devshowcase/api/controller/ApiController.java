@@ -1,0 +1,15 @@
+package com.devshowcase.api.controller;
+import com.devshowcase.api.entity.*; import com.devshowcase.api.repository.*; import com.devshowcase.api.dto.*; import jakarta.validation.Valid; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.util.*; import java.util.stream.*;
+@RestController @RequestMapping("/api")
+public class ApiController {
+ private final ProfileRepository profiles; private final TechnologyRepository technologies; private final ProjectRepository projects;
+ public ApiController(ProfileRepository p,TechnologyRepository t,ProjectRepository pr){profiles=p;technologies=t;projects=pr;}
+ @PostMapping("/profiles") public ResponseEntity<ProfileDtos.Response> createProfile(@Valid @RequestBody ProfileDtos.Create d){Profile p=new Profile();p.setName(d.name());p.setEmail(d.email());p.setBio(d.bio());p=profiles.save(p);return ResponseEntity.status(HttpStatus.CREATED).body(new ProfileDtos.Response(p.getId(),p.getName(),p.getEmail(),p.getBio()));}
+ @GetMapping("/profiles/{id}") public ProfileDtos.Response getProfile(@PathVariable Long id){Profile p=profiles.findById(id).orElseThrow(()->new NoSuchElementException("Profile não encontrado"));return new ProfileDtos.Response(p.getId(),p.getName(),p.getEmail(),p.getBio());}
+ @PostMapping("/technologies") public ResponseEntity<TechnologyDtos.Response> createTechnology(@Valid @RequestBody TechnologyDtos.Create d){Technology t=new Technology();t.setName(d.name());t=technologies.save(t);return ResponseEntity.status(HttpStatus.CREATED).body(new TechnologyDtos.Response(t.getId(),t.getName()));}
+ @GetMapping("/technologies") public List<TechnologyDtos.Response> listTechnologies(){return technologies.findAll().stream().map(t->new TechnologyDtos.Response(t.getId(),t.getName())).toList();}
+ @PostMapping("/projects") public ResponseEntity<ProjectDtos.Response> createProject(@Valid @RequestBody ProjectDtos.Create d){Profile p=profiles.findById(d.profileId()).orElseThrow(()->new NoSuchElementException("Profile não encontrado"));Project pr=new Project();pr.setTitle(d.title());pr.setDescription(d.description());pr.setRepositoryUrl(d.repositoryUrl());pr.setProfile(p);if(d.technologyIds()!=null)pr.getTechnologies().addAll(technologies.findAllById(d.technologyIds()));pr=projects.save(pr);return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(pr));}
+ @GetMapping("/projects") public List<ProjectDtos.Response> listProjects(){return projects.findAll().stream().map(this::toResponse).toList();}
+ private ProjectDtos.Response toResponse(Project p){Set<TechnologyDtos.Response> ts=p.getTechnologies().stream().map(t->new TechnologyDtos.Response(t.getId(),t.getName())).collect(Collectors.toSet());return new ProjectDtos.Response(p.getId(),p.getTitle(),p.getDescription(),p.getRepositoryUrl(),p.getProfile().getId(),ts);}
+ @ExceptionHandler(NoSuchElementException.class) ResponseEntity<Map<String,String>> notFound(NoSuchElementException e){return ResponseEntity.status(404).body(Map.of("erro",e.getMessage()));}
+}
